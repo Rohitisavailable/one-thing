@@ -40,7 +40,3 @@ The generation function verifies the signed-in user, requires a confirmed email,
 The frontend is a static site. Use this folder's contents as the repository root so `render.yaml` is at the top level. Create/link that Git repository in Render. Set Render's `SUPABASE_URL` and `SUPABASE_ANON_KEY` build variables; these are public browser configuration values, and the build script writes the ignored `public/config.js` into the published site. Set the Supabase Edge Function secret `APP_ORIGIN` to the assigned `https://…onrender.com` origin and add that URL to Supabase Auth's allowed URLs. The Supabase project and its Edge Functions deploy separately from the static site.
 
 There are no provider credentials in this repository. Do not commit `public/config.js`, any Backboard API key, or a Supabase service-role key. A public deployment is not ready until real Supabase and Backboard projects are configured and the two accounts/ownership paths have been checked.
-
-## Design reference
-
-The DEV post [Rehearsal: an English coach that runs offline](https://dev.to/aditya_shirsatrao_7ada043/rehearsal-i-built-an-english-coach-that-runs-on-my-laptop-with-the-internet-unplugged-lpg) is a useful example of a challenge write-up grounded in one person's need, a working demo, an explicit architecture, and measured limitations. One Thing takes a different trade-off: persistent multi-user accounts and Backboard generation in exchange for sending the task to hosted services.

@@ -25,7 +25,7 @@ The ownership boundary is in the database: row-level security checks `auth.uid()
 
 ## Why this architecture
 
-I used [Rehearsal](https://dev.to/aditya_shirsatrao_7ada043/rehearsal-i-built-an-english-coach-that-runs-on-my-laptop-with-the-internet-unplugged-lpg) as a reference for making a challenge project specific, demonstrable, and honest about its trade-offs. Rehearsal runs a model locally and can work offline. One Thing follows a different need: a public app that remembers a person's plans when they return.
+One Thing is designed for someone who wants a public app that remembers their plans when they return. That convenience comes with a clear trade-off: task data is sent to hosted services rather than processed entirely on the person's device.
 
 That choice has a real privacy cost. A task is sent to Backboard and the model provider configured by the site operator, and the task plus result are stored in Supabase. Database rules keep other ordinary signed-in users from reading or changing those rows, but this is not end-to-end encryption: the service operators may have access under their own systems and policies. I tell users not to enter highly sensitive details.
 
@@ -33,7 +33,7 @@ That choice has a real privacy cost. A task is sent to Backboard and the model p
 
 Backboard is the API layer; the model is configured separately. The current server configuration selects Backboard's Featherless provider and the open-weight `Qwen/Qwen2.5-7B-Instruct` model ([model card and Apache-2.0 license](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct)). The model choice remains replaceable in server configuration, and the prompt that shapes the plan is code we can inspect and change. Backboard documents Featherless as its open-source-model provider and lets each message name its provider and model ([message API](https://docs.backboard.io/concepts/messages), [provider/model catalog](https://docs.backboard.io/api-reference/models/list)).
 
-This is not the offline or no-cost approach from Rehearsal. Each generation depends on the network and may use API credits or incur provider costs. The reason to choose it here is that it supports a public, low-setup experience; the open-weight model can be swapped or self-hosted later instead of treating a closed model as the only option.
+Each generation depends on the network and may use API credits or incur provider costs. The reason to choose this approach is that it supports a public, low-setup experience; the open-weight model can be swapped or self-hosted later instead of treating a closed model as the only option.
 
 ## What I still need to measure
 
