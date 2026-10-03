@@ -1,0 +1,7 @@
+project_id = "one-thing"
+
+[functions.generate-plan]
+verify_jwt = true
+
+[functions.delete-plan]
+verify_jwt = true
