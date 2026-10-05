@@ -15,11 +15,11 @@ Deno.serve(async (req) => {
   const url = Deno.env.get("SUPABASE_URL"); const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const backboardKey = Deno.env.get("BACKBOARD_API_KEY");
-  if (!token || !url || !anonKey) return reply({ error: "Sign in before deleting." }, 401);
+  if (!token || !url || !anonKey) return reply({ error: "A private browser session is required to delete a plan." }, 401);
   if (!serviceKey || !backboardKey) return reply({ error: "The site operator has not finished configuring deletion." }, 503);
   const client = createClient(url, anonKey, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false, autoRefreshToken: false } });
   const { data: { user }, error: authError } = await client.auth.getUser(token);
-  if (authError || !user) return reply({ error: "Your sign-in expired. Sign in and try again." }, 401);
+  if (authError || !user) return reply({ error: "Your private browser session expired. Reload the page and try again." }, 401);
   let body: { plan_id?: string };
   try { body = await req.json(); } catch { return reply({ error: "Request body must be JSON." }, 400); }
   if (!body.plan_id) return reply({ error: "A plan id is required." }, 400);

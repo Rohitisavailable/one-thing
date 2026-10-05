@@ -1,45 +1,23 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 let SUPABASE_URL = '', SUPABASE_ANON_KEY = '';
-try { ({ SUPABASE_URL, SUPABASE_ANON_KEY } = await import('./config.js')); } catch { /* Show the setup message when config.js is not installed. */ }
+try { ({ SUPABASE_URL, SUPABASE_ANON_KEY } = await import('./config.js')); } catch { /* Show setup message if config.js is not installed. */ }
 
 const $ = (id) => document.getElementById(id);
 const missingConfig = !SUPABASE_URL || SUPABASE_URL.includes('YOUR_') || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes('YOUR_');
 const supabase = missingConfig ? null : createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-let currentUser = null;
 let activePlan = null;
 
-function setStatus(message, error = false, target = 'status') {
-  const node = $(target); node.textContent = message; node.className = `status${error ? ' error' : ''}`;
+function setStatus(message, error = false) {
+  const node = $('status'); node.textContent = message; node.className = `status${error ? ' error' : ''}`;
 }
 function escapeName(text) { return String(text || '').slice(0, 70); }
-function showAuth() { $('auth').classList.remove('off'); $('workspace').classList.add('off'); }
-function showWorkspace() { $('auth').classList.add('off'); $('workspace').classList.remove('off'); }
-
-async function setSession(session) {
-  currentUser = session?.user || null;
-  activePlan = null;
-  if (!currentUser) {
-    $('account').textContent = '';
-    $('auth-title').textContent = 'Sign in to your private space';
-    $('signin').textContent = 'Sign in';
-    $('signup').classList.remove('off');
-    showAuth();
-    return;
-  }
-  $('account').replaceChildren(document.createTextNode(currentUser.email || 'Signed in'));
-  const signout = document.createElement('button'); signout.className = 'link-button'; signout.textContent = 'Sign out';
-  signout.addEventListener('click', async () => { await supabase.auth.signOut(); });
-  $('account').append(signout);
-  showWorkspace();
-  await loadPlans();
-}
 
 async function loadPlans(selectId = null) {
   $('plans').replaceChildren();
   const { data, error } = await supabase.from('plans').select('id,title,task,plan,time_budget,energy_level,model_provider,model_name,backboard_thread_id,created_at').order('created_at', { ascending: false });
   if (error) { setStatus('Could not load your plans: ' + error.message, true); return; }
   if (!data.length) {
-    const empty = document.createElement('li'); empty.className = 'hint'; empty.textContent = 'No saved plans yet. Your plans will appear here.'; $('plans').append(empty); return;
+    const empty = document.createElement('li'); empty.className = 'hint'; empty.textContent = 'No saved plans yet. Your plans will appear here.'; $('plans').append(empty); $('export-all').disabled = true; return;
   }
   for (const row of data) {
     const li = document.createElement('li'); li.className = 'plan-row';
@@ -47,9 +25,8 @@ async function loadPlans(selectId = null) {
     const date = document.createElement('span'); date.className = 'date'; date.textContent = new Date(row.created_at).toLocaleString();
     pick.append(date); pick.addEventListener('click', () => renderPlan(row)); li.append(pick); $('plans').append(li);
   }
-  const rows = data;
-  const allButton = $('export-all'); allButton.disabled = false;
-  if (selectId) { const selected = rows.find((row) => row.id === selectId); if (selected) renderPlan(selected); }
+  $('export-all').disabled = false;
+  if (selectId) { const selected = data.find((row) => row.id === selectId); if (selected) renderPlan(selected); }
 }
 
 function renderPlan(row) {
@@ -81,24 +58,25 @@ async function generate() {
   setStatus('Asking Backboard for a small, realistic plan.');
   try {
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Your private browser session is unavailable. Reload the page to reconnect.');
     const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-plan`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_ANON_KEY },
       body: JSON.stringify({ task, time_budget: $('time').value.trim(), energy_level: $('energy').value.trim() }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Plan generation failed.');
-    if (!result.saved_plan) throw new Error('The plan was generated but could not be saved to your account.');
-    renderPlan(result.saved_plan); $('thoughts').value = ''; await loadPlans(result.saved_plan.id); setStatus('Your plan is saved to your account.');
+    if (!result.saved_plan) throw new Error('The plan was generated but could not be saved.');
+    renderPlan(result.saved_plan); $('thoughts').value = ''; await loadPlans(result.saved_plan.id); setStatus('Your plan is saved in this browser’s private space.');
   } catch (error) { setStatus(error.message || 'Something went wrong. Try again.', true); }
   finally { button.disabled = false; button.textContent = 'Find one small step'; }
 }
 
 async function deletePlan() {
   if (!activePlan) return;
-  if (!window.confirm('Delete this plan from your account and remove its Backboard conversation? This cannot be undone.')) return;
+  if (!window.confirm('Delete this plan and request removal of its Backboard conversation? This cannot be undone.')) return;
   try {
     const session = (await supabase.auth.getSession()).data.session;
-    if (!session) throw new Error('Sign in again to delete this plan.');
+    if (!session) throw new Error('Your private browser session is unavailable. Reload the page and try again.');
     const response = await fetch(`${SUPABASE_URL}/functions/v1/delete-plan`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_ANON_KEY },
       body: JSON.stringify({ plan_id: activePlan.id }),
@@ -106,22 +84,10 @@ async function deletePlan() {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Could not delete the plan.');
     activePlan = null; $('result-title').textContent = 'You don’t have to do it all at once.'; $('opening').textContent = 'Choose a saved plan or make a new one.'; $('steps').replaceChildren(); $('stop').classList.add('off'); $('result-actions').classList.add('off');
-    setStatus('Plan deleted from your account and Backboard.'); await loadPlans();
+    setStatus('Plan deleted from this private space and Backboard.'); await loadPlans();
   } catch (error) { setStatus(error.message || 'Could not delete the plan.', true); }
 }
 
-$('auth-form').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const { error } = await supabase.auth.signInWithPassword({ email: $('email').value.trim(), password: $('password').value });
-  setStatus(error ? error.message : 'Signed in.', !!error, 'auth-status');
-});
-$('signup').addEventListener('click', async () => {
-  if (!$('auth-form').reportValidity()) return;
-  const { data, error } = await supabase.auth.signUp({ email: $('email').value.trim(), password: $('password').value });
-  if (error) setStatus(error.message, true, 'auth-status');
-  else if (!data.session) setStatus('Check your email to confirm your account, then sign in.', false, 'auth-status');
-  else setStatus('Account created.', false, 'auth-status');
-});
 $('go').addEventListener('click', generate);
 $('export-one').addEventListener('click', () => { if (activePlan) exportPlan(activePlan); });
 $('delete-one').addEventListener('click', deletePlan);
@@ -132,9 +98,24 @@ $('export-all').addEventListener('click', async () => {
 });
 
 if (missingConfig) {
-  showAuth(); $('auth-actions').classList.add('off'); setStatus('Set your Supabase URL and publishable key in config.js to enable accounts.', true, 'auth-status');
+  setStatus('The site is missing its Supabase URL or publishable key. The operator needs to finish setup.', true);
+  $('go').disabled = true;
 } else {
-  supabase.auth.onAuthStateChange((_event, session) => { queueMicrotask(() => setSession(session)); });
-  const { data: { session } } = await supabase.auth.getSession();
-  await setSession(session);
+  try {
+    let { data: { session }, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    if (!session) {
+      const result = await supabase.auth.signInAnonymously();
+      if (result.error) throw result.error;
+      session = result.data.session;
+    }
+    if (!session) throw new Error('Supabase did not create a private browser session.');
+    await loadPlans();
+    if (!$('status').textContent) setStatus('Your private space is ready. Saved plans stay with this browser.');
+  } catch (error) {
+    const detail = String(error.message || 'Could not start a private session.');
+    const needsSetup = /anonymous|disabled|not enabled|signups not allowed/i.test(detail);
+    setStatus(needsSetup ? 'Anonymous sign-ins are not enabled for this Supabase project yet. The site operator must enable them in Supabase Auth settings.' : detail, true);
+    $('go').disabled = true;
+  }
 }

@@ -7,11 +7,11 @@ This is a submission for the **Hacktoberfest Weekend Challenge: Build for a Frie
 
 ## What I built
 
-**One Thing** takes a task list that feels hard to enter and turns it into a few small actions, sized to the time and energy the person has today. A person can save the plan to their account, leave, and find it again later. They can export one plan or their whole library, and delete a plan when it is no longer useful.
+**One Thing** takes a task list that feels hard to enter and turns it into a few small actions, sized to the time and energy the person has today. It creates a private anonymous browser session automatically, so there is no email or password form. Plans remain available in that browser profile when the person returns. This is browser-profile privacy rather than personal identity: anyone using that profile can see its plans, and clearing the browser data or switching devices loses access. People can export one plan or their whole library, and delete a plan when it is no longer useful.
 
-Project: [add public source repository]
+Project: https://github.com/Rohitisavailable/one-thing
 
-Live demo: [add public site URL]
+Live demo: https://one-thing-3y6j.onrender.com/
 
 ## Who it is for
 
@@ -19,15 +19,15 @@ I started with the idea of helping someone who gets stuck when their to-do list 
 
 ## How it works
 
-The frontend is static. Supabase Auth identifies the signed-in account. When the person asks for a plan, a Supabase Edge Function checks the account, forwards the task to Backboard, and saves the task and result in Postgres. The browser lists only that account's rows.
+The frontend is static. Supabase Auth creates an anonymous identity for the browser without asking the visitor to sign up. When they ask for a plan, a Supabase Edge Function verifies that session, forwards the task to Backboard, and saves the task and result in Postgres. The browser lists only rows belonging to that anonymous identity.
 
-The ownership boundary is in the database: row-level security checks `auth.uid() = user_id` for reads and writes. The Edge Function verifies the user token and saves with that user's JWT. The Backboard API key stays in server-side secrets. The function disables Backboard memory and stores the returned thread ID so Delete can remove both the saved row and its Backboard conversation.
+The ownership boundary is in the database: row-level security checks `auth.uid() = user_id` for reads and writes. The Edge Function verifies the browser session and saves with its JWT. The Backboard API key stays in server-side secrets. The function disables Backboard memory and stores the returned thread ID so Delete can remove both the saved row and its Backboard conversation. If someone clears site data or switches devices, their anonymous identity and saved plans cannot be recovered.
 
 ## Why this architecture
 
 One Thing is designed for someone who wants a public app that remembers their plans when they return. That convenience comes with a clear trade-off: task data is sent to hosted services rather than processed entirely on the person's device.
 
-That choice has a real privacy cost. A task is sent to Backboard and the model provider configured by the site operator, and the task plus result are stored in Supabase. Database rules keep other ordinary signed-in users from reading or changing those rows, but this is not end-to-end encryption: the service operators may have access under their own systems and policies. I tell users not to enter highly sensitive details.
+That choice has a real privacy cost. A task is sent to Backboard and the model provider configured by the site operator, and the task plus result are stored in Supabase. Database rules keep other anonymous browser sessions from reading or changing those rows, but this is not end-to-end encryption: the service operators may have access under their own systems and policies. I tell users not to enter highly sensitive details.
 
 ## Why open AI mattered
 
@@ -37,6 +37,6 @@ Each generation depends on the network and may use API credits or incur provider
 
 ## What I still need to measure
 
-Before calling this finished, I need to deploy it, confirm that two separate accounts cannot see each other's plans, verify that delete removes both copies, and ask a real friend whether the generated first step is useful. The database isolation uses Supabase row-level security ([policy docs](https://supabase.com/docs/guides/database/postgres/row-level-security)). I have not run those checks yet, so I will add the results and a real demo link before submitting.
+Before calling this finished, I need to deploy the no-sign-in version, confirm that two separate browser sessions cannot see each other's plans, verify that delete removes both copies, and ask a real friend whether the generated first step is useful. The database isolation uses Supabase row-level security ([policy docs](https://supabase.com/docs/guides/database/postgres/row-level-security)). I have not run those checks yet, so I will add the results and a real handoff before submitting.
 
 **Disclosure:** AI assisted with the code and this write-up. #hf26challenge

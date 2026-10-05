@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return reply({ error: "Method not allowed." }, 405);
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "");
-  if (!token) return reply({ error: "Sign in before generating a plan." }, 401);
+  if (!token) return reply({ error: "A private browser session is required to generate a plan." }, 401);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
@@ -25,9 +25,7 @@ Deno.serve(async (req) => {
 
   const authClient = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: { user }, error: authError } = await authClient.auth.getUser(token);
-  if (authError || !user) return reply({ error: "Your sign-in expired. Sign in and try again." }, 401);
-  if (!user.email_confirmed_at) return reply({ error: "Confirm your email before generating plans." }, 403);
-
+  if (authError || !user) return reply({ error: "Your private browser session expired. Reload the page and try again." }, 401);
   let input: { task?: string; time_budget?: string; energy_level?: string };
   try { input = await req.json(); } catch { return reply({ error: "Request body must be JSON." }, 400); }
   const task = typeof input.task === "string" ? input.task.trim() : "";
